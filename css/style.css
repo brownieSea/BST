@@ -257,21 +257,22 @@ tbody tr:last-child td { border-bottom: none; }
 .empty-state { text-align: center; padding: 40px 0; color: var(--text3); font-size: 14px; }
 
 /* ── PERIOD NAV ─────────────────────────────────────── */
-.period-nav {
-  display: flex; align-items: center; gap: 4px;
+.chart-nav {
+  display: flex; align-items: center; gap: 6px;
 }
 .nav-arrow {
   background: none; border: 1px solid var(--border);
-  color: var(--text2); width: 28px; height: 28px;
-  border-radius: var(--radius-sm); font-size: 18px; line-height: 1;
+  color: var(--text2); width: 30px; height: 30px;
+  border-radius: var(--radius-sm); font-size: 13px; line-height: 1;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s; padding: 0;
+  transition: all 0.15s; padding: 0; flex-shrink: 0;
 }
-.nav-arrow:hover { border-color: var(--border2); color: var(--accent); }
-.nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+.nav-arrow:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.nav-arrow:disabled { opacity: 0.25; cursor: not-allowed; }
 #periodLabel {
-  font-size: 12px; color: var(--text2); min-width: 80px;
+  font-size: 11px; color: var(--text3); min-width: 90px;
   text-align: center; font-family: "DM Mono", monospace;
+  white-space: nowrap;
 }
 
 /* ── RESPONSIVE: 좁은 화면 (태블릿/모바일) ──────────── */
