@@ -321,10 +321,16 @@ function attachChartTooltip(chart, rows) {
 
     const cx = event.clientX || event.touches?.[0]?.clientX || 0;
     const cy = event.clientY || event.touches?.[0]?.clientY || 0;
-    const tw = 200, th = 140;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    tip.style.left = (cx + 14 + tw > vw ? cx - tw - 14 : cx + 14) + 'px';
-    tip.style.top  = (cy + th > vh ? cy - th : cy + 6) + 'px';
+    const isMobile = window.innerWidth <= 640;
+    if (isMobile) {
+      tip.style.left = '12px'; tip.style.right = '12px';
+      tip.style.bottom = '16px'; tip.style.top = 'auto'; tip.style.width = 'auto';
+    } else {
+      tip.style.right = ''; tip.style.bottom = ''; tip.style.width = '';
+      const tw = 200, th = 140, vw = window.innerWidth, vh = window.innerHeight;
+      tip.style.left = (cx + 14 + tw > vw ? cx - tw - 14 : cx + 14) + 'px';
+      tip.style.top  = (cy + th > vh ? cy - th : cy + 6) + 'px';
+    }
     tip.classList.add('show');
   }
 
