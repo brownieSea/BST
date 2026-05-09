@@ -7,158 +7,230 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    #lock-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lock-box {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 36px 32px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      width: 100%; max-width: 320px; text-align: center;
+    }
+    .lock-icon { font-size: 28px; margin-bottom: 12px; color: var(--accent); }
+    .lock-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 20px; color: var(--text);
+      font-weight: 400; margin-bottom: 6px;
+    }
+    .lock-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
+    .lock-input {
+      width: 100%; padding: 11px 14px; font-size: 16px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text);
+      font-family: 'DM Sans', sans-serif; outline: none;
+      text-align: center; letter-spacing: 0.1em;
+      margin-bottom: 12px; transition: border-color 0.15s;
+    }
+    .lock-input:focus { border-color: var(--accent); background: var(--bg2); }
+    .lock-input.error { border-color: #c0392b; animation: shake 0.3s ease; }
+    .lock-btn {
+      width: 100%; padding: 11px;
+      background: var(--accent); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+    }
+    .lock-btn:hover { background: var(--accent2); }
+    .lock-error { font-size: 12px; color: #c0392b; margin-top: 10px; min-height: 18px; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+  </style>
 </head>
 <body>
-  <div class="bg-grid"></div>
-
-  <header>
-    <div class="header-inner">
-      <div class="logo">
-        <span class="logo-icon">◎</span>
-        <span class="logo-text">Glucose<em>Log</em></span>
-      </div>
-      <nav>
-        <button class="nav-btn active" data-tab="dashboard">대시보드</button>
-        <button class="nav-btn" data-tab="log">기록</button>
-        <button class="nav-btn" data-tab="add">입력</button>
-      </nav>
-      <button class="sync-btn" id="syncBtn" title="데이터 새로고침">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        <span>동기화</span>
-      </button>
+  <!-- 잠금 화면 -->
+  <div id="lock-screen">
+    <div class="lock-box">
+      <div class="lock-icon">◎</div>
+      <div class="lock-title">Glucose<em style="color:var(--accent);font-style:normal">Log</em></div>
+      <div class="lock-sub">비밀번호를 입력하세요</div>
+      <input class="lock-input" type="password" id="pw-input" placeholder="••••••" autocomplete="current-password">
+      <button class="lock-btn" id="pw-btn">확인</button>
+      <div class="lock-error" id="pw-error"></div>
     </div>
-  </header>
+  </div>
 
-  <main>
-    <!-- DASHBOARD -->
-    <section id="tab-dashboard" class="tab active">
-      <div class="stats-row" id="statsRow"></div>
+  <div id="app" style="display:none">
+    <div class="bg-grid"></div>
 
-      <div class="chart-panel">
-        <div class="panel-header">
-          <h2>혈당 추이</h2>
-          <div class="range-pills">
-            <button class="pill active" data-range="10">10일</button>
-            <button class="pill" data-range="30">1개월</button>
-            <button class="pill" data-range="0">전체</button>
-          </div>
+    <header>
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-icon">◎</span>
+          <span class="logo-text">Glucose<em>Log</em></span>
         </div>
-        <div class="chart-legend">
-          <span class="leg"><span class="leg-dot" style="background:#f97316"></span>메타파워 복용</span>
-          <span class="leg"><span class="leg-dot" style="background:#fde047"></span>레몬 복용</span>
-          <span class="leg"><span class="leg-dot" style="background:#94a3b8"></span>미복용</span>
-          <span class="leg leg-line" style="color:#f87171">── 주의선(100)</span>
-          <span class="leg leg-line" style="color:#fb923c">── 위험선(126)</span>
-        </div>
-        <div class="chart-wrap">
-          <canvas id="trendChart"></canvas>
-        </div>
+        <nav>
+          <button class="nav-btn active" data-tab="dashboard">대시보드</button>
+          <button class="nav-btn" data-tab="log">기록</button>
+          <button class="nav-btn" data-tab="add">입력</button>
+        </nav>
+        <button class="sync-btn" id="syncBtn" title="데이터 새로고침">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          <span>동기화</span>
+        </button>
       </div>
+    </header>
 
-      <div class="two-col">
+    <main>
+      <!-- DASHBOARD -->
+      <section id="tab-dashboard" class="tab active">
+        <div class="stats-row" id="statsRow"></div>
+
         <div class="chart-panel">
-          <div class="panel-header"><h2>월별 평균</h2></div>
-          <div class="chart-wrap short"><canvas id="monthChart"></canvas></div>
+          <div class="panel-header">
+            <h2>혈당 추이</h2>
+            <div class="range-pills">
+              <button class="pill active" data-range="10">10일</button>
+              <button class="pill" data-range="30">1개월</button>
+              <button class="pill" data-range="0">전체</button>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <span class="leg"><span class="leg-dot" style="background:#f97316"></span>메타파워 복용</span>
+            <span class="leg"><span class="leg-dot" style="background:#ca8a04"></span>레몬 복용</span>
+            <span class="leg"><span class="leg-dot" style="background:#94a3b8"></span>미복용</span>
+            <span class="leg leg-line" style="color:#ef4444">── 주의선(100)</span>
+            <span class="leg leg-line" style="color:#f97316">── 위험선(126)</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="trendChart"></canvas>
+          </div>
         </div>
-        <div class="chart-panel">
-          <div class="panel-header"><h2>오일 효과 분석</h2></div>
-          <div class="chart-wrap short"><canvas id="oilChart"></canvas></div>
-          <p class="chart-note">복용 없음 / 메타파워 / 레몬 / 둘 다 복용 시 평균 혈당</p>
-        </div>
-      </div>
-    </section>
 
-    <!-- LOG -->
-    <section id="tab-log" class="tab">
-      <div class="log-controls">
-        <select id="filterMonth"><option value="">전체</option></select>
-        <select id="filterPeriod">
-          <option value="">전체 기간</option>
-          <option value="1">상순 (1–10일)</option>
-          <option value="2">중순 (11–20일)</option>
-          <option value="3">하순 (21–31일)</option>
-        </select>
-        <select id="filterOil">
-          <option value="">오일 전체</option>
-          <option value="meta">메타파워</option>
-          <option value="lemon">레몬</option>
-          <option value="both">둘 다</option>
-          <option value="none">미복용</option>
-        </select>
-      </div>
-      <div class="table-wrap">
-        <table id="logTable">
-          <thead>
-            <tr>
-              <th>날짜</th>
-              <th>시간</th>
-              <th>혈당</th>
-              <th>상태</th>
-              <th>메타</th>
-              <th>레몬</th>
-              <th>수면</th>
-              <th>식사</th>
-            </tr>
-          </thead>
-          <tbody id="logBody"></tbody>
-        </table>
-      </div>
-    </section>
+        <div class="two-col">
+          <div class="chart-panel">
+            <div class="panel-header"><h2>월별 평균</h2></div>
+            <div class="chart-wrap short"><canvas id="monthChart"></canvas></div>
+          </div>
+          <div class="chart-panel">
+            <div class="panel-header"><h2>오일 효과 분석</h2></div>
+            <div class="chart-wrap short"><canvas id="oilChart"></canvas></div>
+            <p class="chart-note">미복용 / 메타파워 / 레몬 / 둘 다 복용 시 평균 혈당</p>
+          </div>
+        </div>
+      </section>
 
-    <!-- ADD -->
-    <section id="tab-add" class="tab">
-      <div class="form-card">
-        <h2>새 기록</h2>
-        <div class="form-grid">
-          <div class="fg">
-            <label>날짜</label>
-            <input type="date" id="f-date">
-          </div>
-          <div class="fg">
-            <label>측정 시간</label>
-            <input type="time" id="f-time">
-          </div>
-          <div class="fg">
-            <label>혈당 수치 <em>(mg/dL)</em></label>
-            <input type="number" id="f-glucose" placeholder="예: 112" min="50" max="400">
-          </div>
-          <div class="fg">
-            <label>수면 시간</label>
-            <input type="text" id="f-sleep" placeholder="예: 7시간 30분">
-          </div>
-          <div class="fg">
-            <label>메타파워 <em>(방울)</em></label>
-            <input type="number" id="f-meta" placeholder="0" min="0">
-          </div>
-          <div class="fg">
-            <label>레몬 오일 <em>(방울)</em></label>
-            <input type="number" id="f-lemon" placeholder="0" min="0">
-          </div>
-          <div class="fg full">
-            <label>전날 마지막 식사 내용</label>
-            <input type="text" id="f-meal" placeholder="예: 바질파스타, 샐러드">
-          </div>
-          <div class="fg full">
-            <label>비고</label>
-            <textarea id="f-note" placeholder="특이사항"></textarea>
-          </div>
+      <!-- LOG -->
+      <section id="tab-log" class="tab">
+        <div class="log-controls">
+          <select id="filterMonth"><option value="">전체</option></select>
+          <select id="filterPeriod">
+            <option value="">전체 기간</option>
+            <option value="1">상순 (1–10일)</option>
+            <option value="2">중순 (11–20일)</option>
+            <option value="3">하순 (21–31일)</option>
+          </select>
+          <select id="filterOil">
+            <option value="">오일 전체</option>
+            <option value="meta">메타파워</option>
+            <option value="lemon">레몬</option>
+            <option value="both">둘 다</option>
+            <option value="none">미복용</option>
+          </select>
         </div>
-        <div class="form-actions">
-          <button class="btn-save" id="saveBtn">저장</button>
-          <span class="save-status" id="saveStatus"></span>
+        <div class="table-wrap">
+          <table id="logTable">
+            <thead>
+              <tr>
+                <th>날짜</th><th>시간</th><th>혈당</th><th>상태</th>
+                <th>메타</th><th>레몬</th><th>수면</th><th>식사</th>
+              </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+          </table>
         </div>
-        <div class="sheets-info">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          저장 시 Google Sheets에 자동 기록됩니다.
-        </div>
-      </div>
-    </section>
-  </main>
+      </section>
 
-  <div class="tooltip" id="tooltip"></div>
+      <!-- ADD -->
+      <section id="tab-add" class="tab">
+        <div class="form-card">
+          <h2>새 기록</h2>
+          <div class="form-grid">
+            <div class="fg"><label>날짜</label><input type="date" id="f-date"></div>
+            <div class="fg"><label>측정 시간</label><input type="time" id="f-time"></div>
+            <div class="fg"><label>혈당 수치 <em>(mg/dL)</em></label><input type="number" id="f-glucose" placeholder="예: 112" min="50" max="400"></div>
+            <div class="fg"><label>수면 시간</label><input type="text" id="f-sleep" placeholder="예: 7시간 30분"></div>
+            <div class="fg"><label>메타파워 <em>(방울)</em></label><input type="number" id="f-meta" placeholder="0" min="0"></div>
+            <div class="fg"><label>레몬 오일 <em>(방울)</em></label><input type="number" id="f-lemon" placeholder="0" min="0"></div>
+            <div class="fg full"><label>전날 마지막 식사 내용</label><input type="text" id="f-meal" placeholder="예: 바질파스타, 샐러드"></div>
+            <div class="fg full"><label>비고</label><textarea id="f-note" placeholder="특이사항"></textarea></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-save" id="saveBtn">저장</button>
+            <span class="save-status" id="saveStatus"></span>
+          </div>
+          <div class="sheets-info">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            저장 시 Google Sheets에 자동 기록됩니다.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="tooltip" id="tooltip"></div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="js/config.js"></script>
+  <script>
+    // ── 비밀번호 잠금 ──────────────────────────────────────
+    // config.js의 CONFIG 객체에 PASSWORD 항목을 추가하세요:
+    // PASSWORD: "원하는비밀번호"
+    const STORAGE_KEY = 'gl_auth';
+
+    function checkAuth() {
+      return localStorage.getItem(STORAGE_KEY) === btoa(CONFIG.PASSWORD);
+    }
+
+    function unlock() {
+      localStorage.setItem(STORAGE_KEY, btoa(CONFIG.PASSWORD));
+      document.getElementById('lock-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+    }
+
+    function tryPassword() {
+      const val = document.getElementById('pw-input').value;
+      const input = document.getElementById('pw-input');
+      const err = document.getElementById('pw-error');
+      if (val === CONFIG.PASSWORD) {
+        unlock();
+      } else {
+        input.classList.add('error');
+        err.textContent = '비밀번호가 맞지 않습니다.';
+        setTimeout(() => input.classList.remove('error'), 400);
+        input.value = '';
+        input.focus();
+      }
+    }
+
+    document.getElementById('pw-btn').addEventListener('click', tryPassword);
+    document.getElementById('pw-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') tryPassword();
+    });
+
+    // 이미 인증된 경우 바로 앱 표시
+    if (checkAuth()) {
+      document.getElementById('lock-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+    } else {
+      setTimeout(() => document.getElementById('pw-input').focus(), 100);
+    }
+  </script>
   <script src="js/app.js"></script>
 </body>
 </html>
