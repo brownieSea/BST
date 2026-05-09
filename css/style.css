@@ -256,6 +256,24 @@ tbody tr:last-child td { border-bottom: none; }
 /* ── EMPTY ───────────────────────────────────────── */
 .empty-state { text-align: center; padding: 40px 0; color: var(--text3); font-size: 14px; }
 
+/* ── PERIOD NAV ─────────────────────────────────────── */
+.period-nav {
+  display: flex; align-items: center; gap: 4px;
+}
+.nav-arrow {
+  background: none; border: 1px solid var(--border);
+  color: var(--text2); width: 28px; height: 28px;
+  border-radius: var(--radius-sm); font-size: 18px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; padding: 0;
+}
+.nav-arrow:hover { border-color: var(--border2); color: var(--accent); }
+.nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+#periodLabel {
+  font-size: 12px; color: var(--text2); min-width: 80px;
+  text-align: center; font-family: "DM Mono", monospace;
+}
+
 /* ── RESPONSIVE: 좁은 화면 (태블릿/모바일) ──────────── */
 @media (max-width: 700px) {
   /* 두 칸 → 한 칸 */
