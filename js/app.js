@@ -4,7 +4,9 @@
 
 let ALL_DATA = [];
 let trendChart = null, monthChart = null, oilChart = null;
-let currentRange = 10;
+let currentRange = 10; // 10 = 10일, 30 = 1개월
+let periodOffset = 0;  // 0 = 현재, -1 = 이전, 1 = 다음 (사용 안함)
+let periodIndex = 0;   // 현재 보여주는 기간 인덱스 (0 = 가장 최근)
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -68,26 +70,20 @@ function isAfterMeal(row) {
 
 function pointColor(row) {
   const t = oilType(row);
+  const after = isAfterMeal(row);
   if (t === 'none') return '#333333';
-  // 오일 복용한 경우 식후/식간 색상 동일, 테두리로 구분
-  if (t === 'meta') return '#ffc72e';
-  if (t === 'lemon') return '#fff98c';
-  if (t === 'both') return '#82af8c';
+  if (t === 'meta') return after ? '#e8900a' : '#fcd34d';
+  if (t === 'lemon') return after ? '#a3a800' : '#f0f08c';
+  if (t === 'both') return after ? '#5a8a6a' : '#a8d4b4';
   return '#333333';
 }
 
 function pointBorderColor(row) {
-  const t = oilType(row);
-  if (t === 'none') return '#333333';
-  // 식후(Y) → 테두리 없음(같은색), 식간(N) → 흰 테두리
-  if (isAfterMeal(row)) return pointColor(row);
-  return '#ffffff';
+  return pointColor(row);
 }
 
 function pointBorderWidth(row) {
-  const t = oilType(row);
-  if (t === 'none') return 1;
-  return isAfterMeal(row) ? 0 : 2;
+  return 0;
 }
 
 // ── CSV Fetch ────────────────────────────────────────────────
@@ -257,11 +253,62 @@ function renderStats() {
   `;
 }
 
+// ── Period helpers ───────────────────────────────────────────
+
+function getPeriodRows() {
+  const sorted = [...ALL_DATA].sort((a,b) => a.date.localeCompare(b.date));
+  if (currentRange === 10) {
+    // 10일 단위 슬라이스
+    const total = sorted.length;
+    const end = total - (periodIndex * 10);
+    const start = Math.max(0, end - 10);
+    return sorted.slice(start, end);
+  } else {
+    // 1개월 단위
+    const months = [...new Set(sorted.map(r => r.date.slice(0,7)))].sort();
+    const mIdx = months.length - 1 - periodIndex;
+    if (mIdx < 0) return [];
+    const m = months[mIdx];
+    return sorted.filter(r => r.date.startsWith(m));
+  }
+}
+
+function getPeriodLabel() {
+  const rows = getPeriodRows();
+  if (!rows.length) return '';
+  if (currentRange === 10) {
+    return rows[0].date.slice(5) + ' – ' + rows[rows.length-1].date.slice(5);
+  } else {
+    return rows[0].date.slice(0,7);
+  }
+}
+
+function updatePeriodNav() {
+  const label = document.getElementById('periodLabel');
+  const prev  = document.getElementById('prevPeriod');
+  const next  = document.getElementById('nextPeriod');
+  if (!label) return;
+  label.textContent = getPeriodLabel();
+
+  // 다음(더 최근) 버튼 — periodIndex=0이면 비활성
+  next.disabled = periodIndex <= 0;
+
+  // 이전(더 과거) 버튼 — 더 이상 데이터 없으면 비활성
+  const sorted = [...ALL_DATA].sort((a,b) => a.date.localeCompare(b.date));
+  if (currentRange === 10) {
+    const total = sorted.length;
+    const end = total - ((periodIndex + 1) * 10);
+    prev.disabled = end <= 0;
+  } else {
+    const months = [...new Set(sorted.map(r => r.date.slice(0,7)))].sort();
+    prev.disabled = periodIndex >= months.length - 1;
+  }
+}
+
 // ── Trend Chart ──────────────────────────────────────────────
 
 function renderTrend() {
-  let rows = [...ALL_DATA];
-  if (currentRange > 0) rows = rows.slice(-currentRange);
+  let rows = getPeriodRows();
 
   const labels = rows.map(r => r.date.slice(5));
   const vals   = rows.map(r => r.glucose || null);
@@ -332,6 +379,7 @@ function renderTrend() {
 
   // Custom tooltip
   attachChartTooltip(trendChart, rows);
+  updatePeriodNav();
 }
 
 function attachChartTooltip(chart, rows) {
@@ -424,14 +472,32 @@ function renderMonthChart() {
 // ── Oil Effect Chart ─────────────────────────────────────────
 
 function renderOilChart() {
-  const groups = { none: [], meta: [], lemon: [], both: [] };
-  ALL_DATA.forEach(r => groups[oilType(r)].push(r.glucose));
+  const groups = {
+    none: [], 
+    meta_after: [], meta_between: [],
+    lemon_after: [], lemon_between: [],
+    both_after: [], both_between: []
+  };
+  ALL_DATA.forEach(r => {
+    if (!r.glucose) return;
+    const t = oilType(r);
+    const after = isAfterMeal(r);
+    if (t === 'none') groups.none.push(r.glucose);
+    else if (t === 'meta') after ? groups.meta_after.push(r.glucose) : groups.meta_between.push(r.glucose);
+    else if (t === 'lemon') after ? groups.lemon_after.push(r.glucose) : groups.lemon_between.push(r.glucose);
+    else if (t === 'both') after ? groups.both_after.push(r.glucose) : groups.both_between.push(r.glucose);
+  });
 
-  const avg = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
-  const labels  = ['미복용', '메타파워', '레몬', '둘 다'];
-  const vals    = [avg(groups.none), avg(groups.meta), avg(groups.lemon), avg(groups.both)];
-  const counts  = [groups.none.length, groups.meta.length, groups.lemon.length, groups.both.length];
-  const bgColors = ['rgba(180,180,180,0.6)', 'rgba(255,199,46,0.8)', 'rgba(255,249,140,0.8)', 'rgba(130,175,140,0.7)'];
+  const avg = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : null;
+  const allLabels = ['미복용', '메타 식후', '메타 식간', '레몬 식후', '레몬 식간', '둘다 식후', '둘다 식간'];
+  const allVals   = [avg(groups.none), avg(groups.meta_after), avg(groups.meta_between), avg(groups.lemon_after), avg(groups.lemon_between), avg(groups.both_after), avg(groups.both_between)];
+  const allColors = ['rgba(51,51,51,0.7)', 'rgba(232,144,10,0.8)', 'rgba(252,211,77,0.8)', 'rgba(163,168,0,0.8)', 'rgba(240,240,140,0.8)', 'rgba(90,138,106,0.8)', 'rgba(168,212,180,0.8)'];
+
+  // null(데이터 없음) 제거
+  const labels  = allLabels.filter((_, i) => allVals[i] !== null);
+  const vals    = allVals.filter(v => v !== null);
+  const bgColors = allColors.filter((_, i) => allVals[i] !== null);
+  const counts  = [groups.none, groups.meta_after, groups.meta_between, groups.lemon_after, groups.lemon_between, groups.both_after, groups.both_between].filter((_, i) => allVals[i] !== null).map(g => g.length);
 
   const ctx = document.getElementById('oilChart').getContext('2d');
   if (oilChart) oilChart.destroy();
@@ -582,8 +648,20 @@ document.querySelectorAll('.pill').forEach(pill => {
     document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
     pill.classList.add('active');
     currentRange = parseInt(pill.dataset.range);
+    periodIndex = 0;
     renderTrend();
   });
+});
+
+// ── Period navigation ─────────────────────────────────────────
+
+document.getElementById('prevPeriod').addEventListener('click', () => {
+  periodIndex++;
+  renderTrend();
+});
+
+document.getElementById('nextPeriod').addEventListener('click', () => {
+  if (periodIndex > 0) { periodIndex--; renderTrend(); }
 });
 
 // ── Log filters ───────────────────────────────────────────────
