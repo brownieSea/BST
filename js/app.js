@@ -63,9 +63,9 @@ function oilType(row) {
 
 function pointColor(row) {
   const t = oilType(row);
-  if (t === 'meta') return '#c4784a';
-  if (t === 'lemon') return '#a89240';
-  if (t === 'both') return '#5a8a6a'; // both → sage green
+  if (t === 'meta') return '#dc9070';
+  if (t === 'lemon') return '#bfaf64';
+  if (t === 'both') return '#82af8c';
   return '#9ca3af';
 }
 
@@ -385,7 +385,7 @@ function renderOilChart() {
   const labels  = ['미복용', '메타파워', '레몬', '둘 다'];
   const vals    = [avg(groups.none), avg(groups.meta), avg(groups.lemon), avg(groups.both)];
   const counts  = [groups.none.length, groups.meta.length, groups.lemon.length, groups.both.length];
-  const bgColors = ['rgba(156,163,175,0.75)', 'rgba(196,120,74,0.75)', 'rgba(168,146,64,0.75)', 'rgba(90,138,106,0.75)'];
+  const bgColors = ['rgba(180,180,180,0.6)', 'rgba(220,160,120,0.7)', 'rgba(190,175,100,0.7)', 'rgba(130,175,140,0.7)'];
 
   const ctx = document.getElementById('oilChart').getContext('2d');
   if (oilChart) oilChart.destroy();
