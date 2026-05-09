@@ -94,16 +94,14 @@
         <div class="chart-panel">
           <div class="panel-header">
             <h2>혈당 추이</h2>
-            <div style="display:flex;align-items:center;gap:8px">
+            <div class="chart-nav">
+              <button class="nav-arrow" id="prevPeriod" title="이전">&#9664;</button>
               <div class="range-pills">
                 <button class="pill active" data-range="10">10일</button>
                 <button class="pill" data-range="30">1개월</button>
               </div>
-              <div class="period-nav">
-                <button class="nav-arrow" id="prevPeriod" title="이전">&#8249;</button>
-                <span id="periodLabel"></span>
-                <button class="nav-arrow" id="nextPeriod" title="다음">&#8250;</button>
-              </div>
+              <button class="nav-arrow" id="nextPeriod" title="다음">&#9654;</button>
+              <span id="periodLabel"></span>
             </div>
           </div>
           <div class="chart-legend">
