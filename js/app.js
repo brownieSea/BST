@@ -567,3 +567,17 @@ function setFormDefaults() {
 
 setFormDefaults();
 fetchData();
+
+// ── Resize handler ────────────────────────────────────────────
+// 브라우저 리사이즈 시 모든 차트 재렌더링
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (document.getElementById('tab-dashboard').classList.contains('active')) {
+      renderTrend();
+      renderMonthChart();
+      renderOilChart();
+    }
+  }, 150);
+});
