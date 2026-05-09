@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>공복 혈당 트래커</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">◎</span>
+        <span class="logo-text">Glucose<em>Log</em></span>
+      </div>
+      <nav>
+        <button class="nav-btn active" data-tab="dashboard">대시보드</button>
+        <button class="nav-btn" data-tab="log">기록</button>
+        <button class="nav-btn" data-tab="add">입력</button>
+      </nav>
+      <button class="sync-btn" id="syncBtn" title="데이터 새로고침">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <span>동기화</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard" class="tab active">
+      <div class="stats-row" id="statsRow"></div>
+
+      <div class="chart-panel">
+        <div class="panel-header">
+          <h2>혈당 추이</h2>
+          <div class="range-pills">
+            <button class="pill active" data-range="10">10일</button>
+            <button class="pill" data-range="30">1개월</button>
+            <button class="pill" data-range="0">전체</button>
+          </div>
+        </div>
+        <div class="chart-legend">
+          <span class="leg"><span class="leg-dot" style="background:#f97316"></span>메타파워 복용</span>
+          <span class="leg"><span class="leg-dot" style="background:#fde047"></span>레몬 복용</span>
+          <span class="leg"><span class="leg-dot" style="background:#94a3b8"></span>미복용</span>
+          <span class="leg leg-line" style="color:#f87171">── 주의선(100)</span>
+          <span class="leg leg-line" style="color:#fb923c">── 위험선(126)</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="chart-panel">
+          <div class="panel-header"><h2>월별 평균</h2></div>
+          <div class="chart-wrap short"><canvas id="monthChart"></canvas></div>
+        </div>
+        <div class="chart-panel">
+          <div class="panel-header"><h2>오일 효과 분석</h2></div>
+          <div class="chart-wrap short"><canvas id="oilChart"></canvas></div>
+          <p class="chart-note">복용 없음 / 메타파워 / 레몬 / 둘 다 복용 시 평균 혈당</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOG -->
+    <section id="tab-log" class="tab">
+      <div class="log-controls">
+        <select id="filterMonth"><option value="">전체</option></select>
+        <select id="filterPeriod">
+          <option value="">전체 기간</option>
+          <option value="1">상순 (1–10일)</option>
+          <option value="2">중순 (11–20일)</option>
+          <option value="3">하순 (21–31일)</option>
+        </select>
+        <select id="filterOil">
+          <option value="">오일 전체</option>
+          <option value="meta">메타파워</option>
+          <option value="lemon">레몬</option>
+          <option value="both">둘 다</option>
+          <option value="none">미복용</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table id="logTable">
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>시간</th>
+              <th>혈당</th>
+              <th>상태</th>
+              <th>메타</th>
+              <th>레몬</th>
+              <th>수면</th>
+              <th>식사</th>
+            </tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ADD -->
+    <section id="tab-add" class="tab">
+      <div class="form-card">
+        <h2>새 기록</h2>
+        <div class="form-grid">
+          <div class="fg">
+            <label>날짜</label>
+            <input type="date" id="f-date">
+          </div>
+          <div class="fg">
+            <label>측정 시간</label>
+            <input type="time" id="f-time">
+          </div>
+          <div class="fg">
+            <label>혈당 수치 <em>(mg/dL)</em></label>
+            <input type="number" id="f-glucose" placeholder="예: 112" min="50" max="400">
+          </div>
+          <div class="fg">
+            <label>수면 시간</label>
+            <input type="text" id="f-sleep" placeholder="예: 7시간 30분">
+          </div>
+          <div class="fg">
+            <label>메타파워 <em>(방울)</em></label>
+            <input type="number" id="f-meta" placeholder="0" min="0">
+          </div>
+          <div class="fg">
+            <label>레몬 오일 <em>(방울)</em></label>
+            <input type="number" id="f-lemon" placeholder="0" min="0">
+          </div>
+          <div class="fg full">
+            <label>전날 마지막 식사 내용</label>
+            <input type="text" id="f-meal" placeholder="예: 바질파스타, 샐러드">
+          </div>
+          <div class="fg full">
+            <label>비고</label>
+            <textarea id="f-note" placeholder="특이사항"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-save" id="saveBtn">저장</button>
+          <span class="save-status" id="saveStatus"></span>
+        </div>
+        <div class="sheets-info">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          저장 시 Google Sheets에 자동 기록됩니다.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
