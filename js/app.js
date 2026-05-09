@@ -88,15 +88,37 @@ async function fetchData() {
   }
 }
 
+function splitCSVLine(line) {
+  const result = [];
+  let cur = '';
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuote && line[i+1] === '"') { cur += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if (ch === ',' && !inQuote) {
+      result.push(cur.trim());
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   const rows = [];
-  for (let i = 1; i < lines.length; i++) { // skip header
-    const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g,'').trim());
+  for (let i = 1; i < lines.length; i++) {
+    const cols = splitCSVLine(lines[i]);
     const C = CONFIG.COLUMNS;
     const date = parseKoreanDate(cols[C.date] || '');
     const glucose = parseInt(cols[C.glucose]);
     if (!date || isNaN(glucose)) continue;
+    const metaVal = parseFloat(cols[C.meta]);
+    const lemonVal = parseFloat(cols[C.lemon]);
     rows.push({
       date,
       time: parseKoreanTime(cols[C.time] || ''),
@@ -104,8 +126,8 @@ function parseCSV(text) {
       lastMealTime: cols[C.lastMealTime] || '',
       meal: cols[C.meal] || '',
       oilYN: cols[C.oilYN] || '',
-      meta: parseFloat(cols[C.meta]) || 0,
-      lemon: parseFloat(cols[C.lemon]) || 0,
+      meta: isNaN(metaVal) ? 0 : metaVal,
+      lemon: isNaN(lemonVal) ? 0 : lemonVal,
       note: cols[C.note] || '',
       sleep: cols[C.sleep] || '',
       prevMed: cols[C.prevMed] || '',
