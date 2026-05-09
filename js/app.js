@@ -473,7 +473,7 @@ function renderMonthChart() {
 
 function renderOilChart() {
   const groups = {
-    none: [], 
+    none: [],
     meta_after: [], meta_between: [],
     lemon_after: [], lemon_between: [],
     both_after: [], both_between: []
@@ -483,21 +483,21 @@ function renderOilChart() {
     const t = oilType(r);
     const after = isAfterMeal(r);
     if (t === 'none') groups.none.push(r.glucose);
-    else if (t === 'meta') after ? groups.meta_after.push(r.glucose) : groups.meta_between.push(r.glucose);
-    else if (t === 'lemon') after ? groups.lemon_after.push(r.glucose) : groups.lemon_between.push(r.glucose);
-    else if (t === 'both') after ? groups.both_after.push(r.glucose) : groups.both_between.push(r.glucose);
+    else if (t === 'meta') { if (after) groups.meta_after.push(r.glucose); else groups.meta_between.push(r.glucose); }
+    else if (t === 'lemon') { if (after) groups.lemon_after.push(r.glucose); else groups.lemon_between.push(r.glucose); }
+    else if (t === 'both') { if (after) groups.both_after.push(r.glucose); else groups.both_between.push(r.glucose); }
   });
 
   const avg = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : null;
+  const allGroups = [groups.none, groups.meta_after, groups.meta_between, groups.lemon_after, groups.lemon_between, groups.both_after, groups.both_between];
   const allLabels = ['미복용', '메타 식후', '메타 식간', '레몬 식후', '레몬 식간', '둘다 식후', '둘다 식간'];
-  const allVals   = [avg(groups.none), avg(groups.meta_after), avg(groups.meta_between), avg(groups.lemon_after), avg(groups.lemon_between), avg(groups.both_after), avg(groups.both_between)];
-  const allColors = ['rgba(51,51,51,0.7)', 'rgba(232,144,10,0.8)', 'rgba(252,211,77,0.8)', 'rgba(163,168,0,0.8)', 'rgba(240,240,140,0.8)', 'rgba(90,138,106,0.8)', 'rgba(168,212,180,0.8)'];
+  const allVals   = allGroups.map(g => avg(g));
+  const allColors = ['rgba(51,51,51,0.7)', 'rgba(232,144,10,0.85)', 'rgba(252,211,77,0.85)', 'rgba(163,168,0,0.85)', 'rgba(240,240,140,0.9)', 'rgba(90,138,106,0.85)', 'rgba(168,212,180,0.85)'];
 
-  // null(데이터 없음) 제거
-  const labels  = allLabels.filter((_, i) => allVals[i] !== null);
-  const vals    = allVals.filter(v => v !== null);
+  const labels   = allLabels.filter((_, i) => allVals[i] !== null);
+  const vals     = allVals.filter(v => v !== null);
   const bgColors = allColors.filter((_, i) => allVals[i] !== null);
-  const counts  = [groups.none, groups.meta_after, groups.meta_between, groups.lemon_after, groups.lemon_between, groups.both_after, groups.both_between].filter((_, i) => allVals[i] !== null).map(g => g.length);
+  const counts   = allGroups.filter((_, i) => allVals[i] !== null).map(g => g.length);
 
   const ctx = document.getElementById('oilChart').getContext('2d');
   if (oilChart) oilChart.destroy();
