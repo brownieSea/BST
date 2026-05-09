@@ -6,9 +6,9 @@ const CONFIG = {
 
   PASSWORD: "9988",
 
-  SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/gviz/tq?tqx=out:csv",
+  SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/1gWwvknhYm7VBbzRNl2dA561QD5NdlIiB3KkRTcxmau0/gviz/tq?tqx=out:csv",
 
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/1gWwvknhYm7VBbzRNl2dA561QD5NdlIiB3KkRTcxmau0/exec",
 
   COLUMNS: {
     date:         0,
