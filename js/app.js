@@ -235,7 +235,7 @@ function renderTrend() {
       datasets: [{
         label: '혈당',
         data: vals,
-        borderColor: 'rgba(110,231,183,0.4)',
+        borderColor: 'rgba(42,124,94,0.35)',
         borderWidth: 1.5,
         pointBackgroundColor: colors,
         pointBorderColor: colors,
@@ -257,7 +257,7 @@ function renderTrend() {
         y: {
           min: 70,
           suggestedMax: 160,
-          grid: { color: 'rgba(255,255,255,0.05)' },
+          grid: { color: 'rgba(0,0,0,0.06)' },
           ticks: { color: '#555b6e', font: { family: "'DM Mono', monospace", size: 11 } },
         },
         x: {
@@ -310,8 +310,8 @@ function attachChartTooltip(chart, rows) {
     const oilLabel = { none:'없음', meta:`메타파워 ${row.meta}방울`, lemon:`레몬 ${row.lemon}방울`, both:`메타 ${row.meta} + 레몬 ${row.lemon}방울` }[ot];
 
     tip.innerHTML = `
-      <div style="font-weight:500;margin-bottom:6px;color:#e8eaf0">${row.date} ${row.time||''}</div>
-      <div class="tooltip-row"><span class="tooltip-key">혈당</span><span class="tooltip-val" style="color:${row.glucose>=126?'#f87171':row.glucose>=100?'#fbbf24':'#6ee7b7'}">${row.glucose} mg/dL</span></div>
+      <div style="font-weight:500;margin-bottom:6px;color:#1e1c18">${row.date} ${row.time||''}</div>
+      <div class="tooltip-row"><span class="tooltip-key">혈당</span><span class="tooltip-val" style="color:${row.glucose>=126?'#b91c1c':row.glucose>=100?'#92600a':'#1f6b47'}">${row.glucose} mg/dL</span></div>
       <div class="tooltip-row"><span class="tooltip-key">상태</span><span class="tooltip-val">${lv.label}</span></div>
       ${ft ? `<div class="tooltip-row"><span class="tooltip-key">공복 시간</span><span class="tooltip-val">${ft}</span></div>` : ''}
       <div class="tooltip-row"><span class="tooltip-key">오일</span><span class="tooltip-val">${oilLabel}</span></div>
@@ -353,7 +353,7 @@ function renderMonthChart() {
   });
   const months = Object.keys(monthly).sort();
   const avgs = months.map(m => Math.round(monthly[m].reduce((a,b)=>a+b,0) / monthly[m].length));
-  const bgColors = avgs.map(v => v >= 126 ? 'rgba(248,113,113,0.7)' : v >= 100 ? 'rgba(251,191,36,0.7)' : 'rgba(110,231,183,0.7)');
+  const bgColors = avgs.map(v => v >= 126 ? 'rgba(220,38,38,0.65)' : v >= 100 ? 'rgba(180,83,9,0.65)' : 'rgba(22,101,52,0.65)');
 
   const ctx = document.getElementById('monthChart').getContext('2d');
   if (monthChart) monthChart.destroy();
@@ -368,7 +368,7 @@ function renderMonthChart() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `평균 ${c.parsed.y} mg/dL` } } },
       scales: {
-        y: { min: 70, suggestedMax: 155, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#555b6e', font: { size: 11 } } },
+        y: { min: 70, suggestedMax: 155, grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#555b6e', font: { size: 11 } } },
         x: { grid: { display: false }, ticks: { color: '#555b6e', font: { size: 11 }, autoSkip: false } }
       }
     }
@@ -406,7 +406,7 @@ function renderOilChart() {
         } }
       },
       scales: {
-        y: { min: 70, suggestedMax: 155, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#555b6e', font: { size: 11 } } },
+        y: { min: 70, suggestedMax: 155, grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#555b6e', font: { size: 11 } } },
         x: { grid: { display: false }, ticks: { color: '#555b6e', font: { size: 11 } } }
       }
     }
@@ -453,7 +453,7 @@ function renderLog() {
     return `<tr>
       <td>${r.date}</td>
       <td>${r.time || '-'}</td>
-      <td class="glucose-val" style="color:${r.glucose>=126?'#f87171':r.glucose>=100?'#fbbf24':'#6ee7b7'}">${r.glucose}</td>
+      <td class="glucose-val" style="color:${r.glucose>=126?'#b91c1c':r.glucose>=100?'#92600a':'#166534'}">${r.glucose}</td>
       <td><span class="stat-badge ${l.cls}">${l.label}</span></td>
       <td>${metaDot}</td>
       <td>${lemonDot}</td>
