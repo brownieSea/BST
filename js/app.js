@@ -1,236 +1,583 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>공복 혈당 트래커</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
-  <style>
-    #lock-screen {
-      position: fixed; inset: 0; z-index: 9999;
-      background: var(--bg);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .lock-box {
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 36px 32px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
-      width: 100%; max-width: 320px; text-align: center;
-    }
-    .lock-icon { font-size: 28px; margin-bottom: 12px; color: var(--accent); }
-    .lock-title {
-      font-family: 'DM Serif Display', serif;
-      font-size: 20px; color: var(--text);
-      font-weight: 400; margin-bottom: 6px;
-    }
-    .lock-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
-    .lock-input {
-      width: 100%; padding: 11px 14px; font-size: 16px;
-      background: var(--bg3); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); color: var(--text);
-      font-family: 'DM Sans', sans-serif; outline: none;
-      text-align: center; letter-spacing: 0.1em;
-      margin-bottom: 12px; transition: border-color 0.15s;
-    }
-    .lock-input:focus { border-color: var(--accent); background: var(--bg2); }
-    .lock-input.error { border-color: #c0392b; animation: shake 0.3s ease; }
-    .lock-btn {
-      width: 100%; padding: 11px;
-      background: var(--accent); color: #fff;
-      border: none; border-radius: var(--radius-sm);
-      font-size: 14px; font-weight: 500; cursor: pointer;
-      font-family: 'DM Sans', sans-serif; transition: background 0.15s;
-    }
-    .lock-btn:hover { background: var(--accent2); }
-    .lock-error { font-size: 12px; color: #c0392b; margin-top: 10px; min-height: 18px; }
-    @keyframes shake {
-      0%,100% { transform: translateX(0); }
-      25% { transform: translateX(-6px); }
-      75% { transform: translateX(6px); }
-    }
-  </style>
-</head>
-<body>
-  <!-- 잠금 화면 -->
-  <div id="lock-screen">
-    <div class="lock-box">
-      <div class="lock-icon">◎</div>
-      <div class="lock-title">Glucose<em style="color:var(--accent);font-style:normal">Log</em></div>
-      <div class="lock-sub">비밀번호를 입력하세요</div>
-      <input class="lock-input" type="password" id="pw-input" placeholder="••••" autocomplete="current-password">
-      <button class="lock-btn" id="pw-btn">확인</button>
-      <div class="lock-error" id="pw-error"></div>
-    </div>
-  </div>
+// ============================================================
+//  GlucoseLog — app.js
+// ============================================================
 
-  <div id="app" style="display:none">
-    <div class="bg-grid"></div>
+let ALL_DATA = [];
+let trendChart = null, monthChart = null, oilChart = null;
+let currentRange = 10;
 
-    <header>
-      <div class="header-inner">
-        <div class="logo">
-          <span class="logo-icon">◎</span>
-          <span class="logo-text">Glucose<em>Log</em></span>
-        </div>
-        <nav>
-          <button class="nav-btn active" data-tab="dashboard">대시보드</button>
-          <button class="nav-btn" data-tab="log">기록</button>
-          <button class="nav-btn" data-tab="add">입력</button>
-        </nav>
-        <button class="sync-btn" id="syncBtn" title="데이터 새로고침">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          <span>동기화</span>
-        </button>
+// ── Helpers ──────────────────────────────────────────────────
+
+function parseKoreanTime(str) {
+  if (!str) return '';
+  str = str.trim();
+  const m = str.match(/([오전후]+)\s*(\d{1,2}):(\d{2})/);
+  if (!m) return str;
+  let h = parseInt(m[2]);
+  if (m[1] === '오후' && h !== 12) h += 12;
+  if (m[1] === '오전' && h === 12) h = 0;
+  return `${String(h).padStart(2,'0')}:${m[3]}`;
+}
+
+function parseKoreanDate(str) {
+  if (!str) return '';
+  str = str.trim();
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0,10);
+  return str;
+}
+
+function fasting(lastMealTime, measureTime) {
+  // Both in HH:MM or Korean format
+  const toMins = t => {
+    const p = parseKoreanTime(t);
+    if (!p) return null;
+    const [h, m] = p.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const meal = toMins(lastMealTime);
+  const meas = toMins(measureTime);
+  if (meal == null || meas == null) return null;
+  let diff = meas - meal;
+  if (diff < 0) diff += 1440; // overnight
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+}
+
+function level(g) {
+  if (g < 70) return { label:'저혈당', cls:'badge-low' };
+  if (g <= 99) return { label:'정상', cls:'badge-normal' };
+  if (g <= 125) return { label:'주의', cls:'badge-caution' };
+  return { label:'높음', cls:'badge-danger' };
+}
+
+function oilType(row) {
+  const m = parseFloat(row.meta) || 0;
+  const l = parseFloat(row.lemon) || 0;
+  if (m > 0 && l > 0) return 'both';
+  if (m > 0) return 'meta';
+  if (l > 0) return 'lemon';
+  return 'none';
+}
+
+function pointColor(row) {
+  const t = oilType(row);
+  if (t === 'meta') return '#c4784a';
+  if (t === 'lemon') return '#a89240';
+  if (t === 'both') return '#5a8a6a'; // both → sage green
+  return '#9ca3af';
+}
+
+// ── CSV Fetch ────────────────────────────────────────────────
+
+async function fetchData() {
+  const url = CONFIG.SHEET_CSV_URL;
+  if (url.includes('YOUR_SHEET_ID')) {
+    loadDemoData();
+    return;
+  }
+  try {
+    const res = await fetch(url + '&cachebust=' + Date.now(), { cache: 'no-store' });
+    const text = await res.text();
+    ALL_DATA = parseCSV(text);
+    renderAll();
+  } catch (e) {
+    console.warn('Fetch failed, using demo data:', e);
+    loadDemoData();
+  }
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) { // skip header
+    const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g,'').trim());
+    const C = CONFIG.COLUMNS;
+    const date = parseKoreanDate(cols[C.date] || '');
+    const glucose = parseInt(cols[C.glucose]);
+    if (!date || isNaN(glucose)) continue;
+    rows.push({
+      date,
+      time: parseKoreanTime(cols[C.time] || ''),
+      glucose,
+      lastMealTime: cols[C.lastMealTime] || '',
+      meal: cols[C.meal] || '',
+      oilYN: cols[C.oilYN] || '',
+      meta: parseFloat(cols[C.meta]) || 0,
+      lemon: parseFloat(cols[C.lemon]) || 0,
+      note: cols[C.note] || '',
+      sleep: cols[C.sleep] || '',
+      prevMed: cols[C.prevMed] || '',
+      lastOil: cols[C.lastOil] || '',
+    });
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function loadDemoData() {
+  const raw = [
+    ['2026-04-07','09:00',150,'','',           'N',0,0,'4.15 오후 2시','','Y',''],
+    ['2026-04-08','10:30',145,'오후 10:00','', 'N',0,0,'','','Y',''],
+    ['2026-04-09','08:50',136,'오후 12:00','', 'Y',2,1,'','','Y',''],
+    ['2026-04-10','08:40',114,'오후 12:00','', 'Y',2,1,'','','Y',''],
+    ['2026-04-11','12:00',110,'오후 12:00','', 'Y',2,1,'','','Y',''],
+    ['2026-04-12','10:50',131,'오전 11:00','', 'N',0,0,'','','Y',''],
+    ['2026-04-13','08:50',131,'오후 12:00','', 'N',0,0,'','','Y',''],
+    ['2026-04-14','10:05',119,'오후 10:00','치킨 2조각','Y',2,6,'','','Y',''],
+    ['2026-04-15','10:05',106,'오후 8:00','요거트+건과류,콩나물국+','Y',2,6,'4.15 오전 10시','','Y',''],
+    ['2026-04-16','','',  '오후 8:00','밀떡볶이,누룽지','Y',0,0,'','','Y',''],
+    ['2026-04-17','08:40',111,'오전 6:00','쌀국수','Y',2,5,'','','Y',''],
+    ['2026-04-18','09:40',116,'오후 8:00','바게트빵 1/2,토마토 1','Y',4,0,'','','Y',''],
+    ['2026-04-19','08:50',128,'오후 8:00','브리또,토마토 1,견과류','Y',3,0,'','','Y',''],
+    ['2026-04-20','09:25',113,'오후 11:00','잡곡밥 1/4,감자조림','Y',2,4,'','','Y',''],
+    ['2026-04-21','09:00',114,'오전 7:30','샤브샤브','Y',0,4,'','','Y',''],
+    ['2026-04-22','09:10',118,'오후 8:00','미니 대저토마토 15개,프','Y',2,4,'','','Y',''],
+    ['2026-04-23','11:00',119,'오후 9:30','떡꼬치 배터지게,미니 대저토마토','Y',2,4,'','','Y',''],
+    ['2026-04-24','12:30',103,'오후 9:30','라면,미니 대저토마토','Y',2,4,'','','Y',''],
+    ['2026-04-25','11:00',123,'오후 9:30','맥주,안주','Y',2,4,'','','Y',''],
+    ['2026-04-26','10:30',98, '오전 1:30','짜장밥','N',0,0,'','','Y',''],
+    ['2026-04-27','08:50',136,'오후 7:00','짜장밥,김자강,녹차아이스','Y',0,4,'','','Y',''],
+    ['2026-04-28','12:30',112,'오후 11:30','바게트빵,계란감자샐러드','N',0,0,'','','Y',''],
+    ['2026-04-29','07:20',136,'오후 9:00','밥,전,나물','N',0,0,'3시간 56분','','Y',''],
+    ['2026-04-30','07:30',127,'오후 9:00','김밥,누룽지,토마토','Y',2,1,'4시간 7분','','Y','N'],
+    ['2026-05-01','07:30',148,'오후 8:00','밥,오이김치,매추리알장조림','Y',0,2,'7시간 13분','','Y','Y'],
+    ['2026-05-02','10:00',107,'오후 7:00','해물찜','Y',4,2,'','Y','Y','Y'],
+    ['2026-05-03','11:40',114,'오후 11:30','김밥','Y',4,4,'7시간 3분','Y','Y','Y'],
+    ['2026-05-04','','',  '오후 10:00','치즈케이크','Y',2,1,'4시간','Y','Y','N'],
+    ['2026-05-05','12:30',128,'오후 10:00','치킨,참외,떡꼬치,beer','Y',4,5,'7시간 30분','Y','Y','Y'],
+    ['2026-05-06','07:20',111,'오후 7:00','케이크,김밥 1개','Y',0,4,'3시간','Y','Y','Y'],
+    ['2026-05-07','07:20',131,'오후 11:30','바질파스타,누룽지','Y',2,1,'5시간','Y','Y','Y'],
+    ['2026-05-08','02:00',123,'오전 7:30','바질잠봉 샌드위치','N',0,0,'5시간','Y','Y','Y'],
+    ['2026-05-08','11:50',106,'','',          'N',0,0,'5시간','Y','Y','Y'],
+    ['2026-05-09','11:00',117,'오후 11:00','짜장밥,꿀파배기','Y',0,0,'7시간','Y','Y','Y'],
+  ].filter(r => r[2]);
+
+  ALL_DATA = raw.map(r => ({
+    date: r[0], time: r[1], glucose: r[2],
+    lastMealTime: r[3], meal: r[4], oilYN: r[5],
+    meta: r[6], lemon: r[7], note: r[8], sleep: r[9],
+    prevMed: r[10], lastOil: r[11],
+  })).sort((a,b) => a.date.localeCompare(b.date));
+
+  renderAll();
+}
+
+// ── Render All ───────────────────────────────────────────────
+
+function renderAll() {
+  renderStats();
+  renderTrend();
+  renderMonthChart();
+  renderOilChart();
+  populateFilters();
+  renderLog();
+}
+
+// ── Stats Cards ──────────────────────────────────────────────
+
+function renderStats() {
+  const d = ALL_DATA;
+  if (!d.length) { document.getElementById('statsRow').innerHTML = '<div class="empty-state">데이터가 없습니다.</div>'; return; }
+
+  const vals = d.map(r => r.glucose);
+  const avg = Math.round(vals.reduce((a,b) => a+b, 0) / vals.length);
+  const latest = d[d.length - 1];
+  const last7 = d.slice(-7);
+  const avg7 = Math.round(last7.map(r=>r.glucose).reduce((a,b)=>a+b,0) / last7.length);
+  const highDays = vals.filter(v => v >= 126).length;
+  const lv = level(latest.glucose);
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">최근 측정</div>
+      <div class="stat-val">${latest.glucose}</div>
+      <div class="stat-sub">${latest.date}
+        <span class="stat-badge ${lv.cls}">${lv.label}</span>
       </div>
-    </header>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">7일 평균</div>
+      <div class="stat-val">${avg7}</div>
+      <div class="stat-sub">mg/dL</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">전체 평균</div>
+      <div class="stat-val">${avg}</div>
+      <div class="stat-sub">${d.length}일 기록</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">높음 횟수</div>
+      <div class="stat-val">${highDays}</div>
+      <div class="stat-sub">전체의 ${Math.round(highDays/d.length*100)}%</div>
+    </div>
+  `;
+}
 
-    <main>
-      <!-- DASHBOARD -->
-      <section id="tab-dashboard" class="tab active">
-        <div class="stats-row" id="statsRow"></div>
+// ── Trend Chart ──────────────────────────────────────────────
 
-        <div class="chart-panel">
-          <div class="panel-header">
-            <h2>혈당 추이</h2>
-            <div class="range-pills">
-              <button class="pill active" data-range="10">10일</button>
-              <button class="pill" data-range="30">1개월</button>
-              <button class="pill" data-range="0">전체</button>
-            </div>
-          </div>
-          <div class="chart-legend">
-            <span class="leg"><span class="leg-dot" style="background:#c4784a"></span>메타파워 복용</span>
-            <span class="leg"><span class="leg-dot" style="background:#a89240"></span>레몬 복용</span>
-            <span class="leg"><span class="leg-dot" style="background:#9ca3af"></span>미복용</span>
-            <span class="leg leg-line" style="color:#ef4444">── 주의선(100)</span>
-            <span class="leg leg-line" style="color:#f97316">── 위험선(126)</span>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="trendChart"></canvas>
-          </div>
-        </div>
+function renderTrend() {
+  let rows = [...ALL_DATA];
+  if (currentRange > 0) rows = rows.slice(-currentRange);
 
-        <div class="two-col">
-          <div class="chart-panel">
-            <div class="panel-header"><h2>월별 평균</h2></div>
-            <div class="chart-wrap short"><canvas id="monthChart"></canvas></div>
-          </div>
-          <div class="chart-panel">
-            <div class="panel-header"><h2>오일 효과 분석</h2></div>
-            <div class="chart-wrap short"><canvas id="oilChart"></canvas></div>
-            <p class="chart-note">미복용 / 메타파워 / 레몬 / 둘 다 복용 시 평균 혈당</p>
-          </div>
-        </div>
-      </section>
+  const labels = rows.map(r => r.date.slice(5));
+  const vals   = rows.map(r => r.glucose);
+  const colors = rows.map(r => pointColor(r));
+  const sizes  = rows.map(() => 6);
 
-      <!-- LOG -->
-      <section id="tab-log" class="tab">
-        <div class="log-controls">
-          <select id="filterMonth"><option value="">전체</option></select>
-          <select id="filterPeriod">
-            <option value="">전체 기간</option>
-            <option value="1">상순 (1–10일)</option>
-            <option value="2">중순 (11–20일)</option>
-            <option value="3">하순 (21–31일)</option>
-          </select>
-          <select id="filterOil">
-            <option value="">오일 전체</option>
-            <option value="meta">메타파워</option>
-            <option value="lemon">레몬</option>
-            <option value="both">둘 다</option>
-            <option value="none">미복용</option>
-          </select>
-        </div>
-        <div class="table-wrap">
-          <table id="logTable">
-            <thead>
-              <tr>
-                <th>날짜</th><th>시간</th><th>혈당</th><th>상태</th>
-                <th>메타</th><th>레몬</th><th>수면</th><th>식사</th>
-              </tr>
-            </thead>
-            <tbody id="logBody"></tbody>
-          </table>
-        </div>
-      </section>
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (trendChart) trendChart.destroy();
 
-      <!-- ADD -->
-      <section id="tab-add" class="tab">
-        <div class="form-card">
-          <h2>새 기록</h2>
-          <div class="form-grid">
-            <div class="fg"><label>날짜</label><input type="date" id="f-date"></div>
-            <div class="fg"><label>측정 시간</label><input type="time" id="f-time"></div>
-            <div class="fg"><label>혈당 수치 <em>(mg/dL)</em></label><input type="number" id="f-glucose" placeholder="예: 112" min="50" max="400"></div>
-            <div class="fg"><label>수면 시간</label><input type="text" id="f-sleep" placeholder="예: 7시간 30분"></div>
-            <div class="fg"><label>메타파워 <em>(방울)</em></label><input type="number" id="f-meta" placeholder="0" min="0"></div>
-            <div class="fg"><label>레몬 오일 <em>(방울)</em></label><input type="number" id="f-lemon" placeholder="0" min="0"></div>
-            <div class="fg full"><label>전날 마지막 식사 내용</label><input type="text" id="f-meal" placeholder="예: 바질파스타, 샐러드"></div>
-            <div class="fg full"><label>비고</label><textarea id="f-note" placeholder="특이사항"></textarea></div>
-          </div>
-          <div class="form-actions">
-            <button class="btn-save" id="saveBtn">저장</button>
-            <span class="save-status" id="saveStatus"></span>
-          </div>
-          <div class="sheets-info">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            저장 시 Google Sheets에 자동 기록됩니다.
-          </div>
-        </div>
-      </section>
-    </main>
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '혈당',
+        data: vals,
+        borderColor: 'rgba(42,124,94,0.35)',
+        borderWidth: 1.5,
+        pointBackgroundColor: colors,
+        pointBorderColor: colors,
+        pointRadius: sizes,
+        pointHoverRadius: 8,
+        tension: 0.3,
+        fill: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: true },
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }, // custom tooltip
+      },
+      scales: {
+        y: {
+          min: 70,
+          suggestedMax: 160,
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          ticks: { color: '#555b6e', font: { family: "'DM Mono', monospace", size: 11 } },
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: '#555b6e', font: { size: 11 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 14 },
+        }
+      },
+      // Reference lines via afterDraw plugin
+    },
+    plugins: [{
+      id: 'refLines',
+      afterDraw(chart) {
+        const { ctx: c, chartArea: { left, right }, scales: { y } } = chart;
+        [[100, 'rgba(248,113,113,0.3)'], [126, 'rgba(251,146,60,0.4)']].forEach(([val, color]) => {
+          const yPos = y.getPixelForValue(val);
+          c.save();
+          c.setLineDash([4, 4]);
+          c.strokeStyle = color;
+          c.lineWidth = 1;
+          c.beginPath(); c.moveTo(left, yPos); c.lineTo(right, yPos); c.stroke();
+          c.restore();
+        });
+      }
+    }]
+  });
 
-    <div class="tooltip" id="tooltip"></div>
-  </div>
+  // Custom tooltip
+  attachChartTooltip(trendChart, rows);
+}
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="js/config.js"></script>
-  <script>
-    // ── 비밀번호 잠금 ──────────────────────────────────────
-    // config.js의 CONFIG 객체에 PASSWORD 항목을 추가하세요:
-    // PASSWORD: "원하는비밀번호"
-    const STORAGE_KEY = 'gl_auth';
+function attachChartTooltip(chart, rows) {
+  const tip = document.getElementById('tooltip');
+  const canvas = chart.canvas;
 
-    function checkAuth() {
-      return localStorage.getItem(STORAGE_KEY) === btoa(CONFIG.PASSWORD);
+  function showTip(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX || (event.touches?.[0]?.clientX)) - rect.left;
+    const y = (event.clientY || (event.touches?.[0]?.clientY)) - rect.top;
+
+    const points = chart.getElementsAtEventForMode({ x, y, native: event }, 'nearest', { intersect: false }, false);
+    if (!points.length) { hideTip(); return; }
+
+    const idx = points[0].index;
+    const row = rows[idx];
+    if (!row) return;
+
+    const lv = level(row.glucose);
+    const ft = fasting(row.lastMealTime, row.time);
+    const ot = oilType(row);
+    const oilLabel = { none:'없음', meta:`메타파워 ${row.meta}방울`, lemon:`레몬 ${row.lemon}방울`, both:`메타 ${row.meta} + 레몬 ${row.lemon}방울` }[ot];
+
+    tip.innerHTML = `
+      <div style="font-weight:500;margin-bottom:6px;color:#1e1c18">${row.date} ${row.time||''}</div>
+      <div class="tooltip-row"><span class="tooltip-key">혈당</span><span class="tooltip-val" style="color:${row.glucose>=126?'#b91c1c':row.glucose>=100?'#92600a':'#1f6b47'}">${row.glucose} mg/dL</span></div>
+      <div class="tooltip-row"><span class="tooltip-key">상태</span><span class="tooltip-val">${lv.label}</span></div>
+      ${ft ? `<div class="tooltip-row"><span class="tooltip-key">공복 시간</span><span class="tooltip-val">${ft}</span></div>` : ''}
+      <div class="tooltip-row"><span class="tooltip-key">오일</span><span class="tooltip-val">${oilLabel}</span></div>
+      ${row.sleep ? `<div class="tooltip-row"><span class="tooltip-key">수면</span><span class="tooltip-val">${row.sleep}</span></div>` : ''}
+      ${row.meal ? `<div class="tooltip-row" style="max-width:200px"><span class="tooltip-key">식사</span><span class="tooltip-val" style="text-align:right;font-family:inherit">${row.meal}</span></div>` : ''}
+    `;
+
+    const cx = event.clientX || event.touches?.[0]?.clientX || 0;
+    const cy = event.clientY || event.touches?.[0]?.clientY || 0;
+    const isMobile = window.innerWidth <= 640;
+    if (isMobile) {
+      tip.style.left = '12px'; tip.style.right = '12px';
+      tip.style.bottom = '16px'; tip.style.top = 'auto'; tip.style.width = 'auto';
+    } else {
+      tip.style.right = ''; tip.style.bottom = ''; tip.style.width = '';
+      const tw = 200, th = 140, vw = window.innerWidth, vh = window.innerHeight;
+      tip.style.left = (cx + 14 + tw > vw ? cx - tw - 14 : cx + 14) + 'px';
+      tip.style.top  = (cy + th > vh ? cy - th : cy + 6) + 'px';
     }
+    tip.classList.add('show');
+  }
 
-    function unlock() {
-      localStorage.setItem(STORAGE_KEY, btoa(CONFIG.PASSWORD));
-      document.getElementById('lock-screen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-    }
+  function hideTip() { tip.classList.remove('show'); }
 
-    function tryPassword() {
-      const val = document.getElementById("pw-input").value.trim();
-      const input = document.getElementById('pw-input');
-      const err = document.getElementById('pw-error');
-      if (val === CONFIG.PASSWORD) {
-        unlock();
-      } else {
-        input.classList.add('error');
-        err.textContent = '비밀번호가 맞지 않습니다.';
-        setTimeout(() => input.classList.remove('error'), 400);
-        input.value = '';
-        input.focus();
+  canvas.addEventListener('mousemove', showTip);
+  canvas.addEventListener('mouseleave', hideTip);
+  canvas.addEventListener('touchstart', showTip, { passive: true });
+  canvas.addEventListener('touchend', hideTip);
+}
+
+// ── Month Chart ──────────────────────────────────────────────
+
+function renderMonthChart() {
+  const monthly = {};
+  ALL_DATA.forEach(r => {
+    const m = r.date.slice(0,7);
+    if (!monthly[m]) monthly[m] = [];
+    monthly[m].push(r.glucose);
+  });
+  const months = Object.keys(monthly).sort();
+  const avgs = months.map(m => Math.round(monthly[m].reduce((a,b)=>a+b,0) / monthly[m].length));
+  const bgColors = avgs.map(() => 'rgba(160,156,150,0.7)');
+
+  const ctx = document.getElementById('monthChart').getContext('2d');
+  if (monthChart) monthChart.destroy();
+
+  monthChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [{ label: '월평균', data: avgs, backgroundColor: bgColors, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `평균 ${c.parsed.y} mg/dL` } } },
+      scales: {
+        y: { min: 70, suggestedMax: 155, grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#555b6e', font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { color: '#555b6e', font: { size: 11 }, autoSkip: false } }
       }
     }
+  });
+}
 
-    document.getElementById('pw-btn').addEventListener('click', tryPassword);
-    document.getElementById('pw-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter') tryPassword();
-    });
+// ── Oil Effect Chart ─────────────────────────────────────────
 
-    // 이미 인증된 경우 바로 앱 표시
-    if (checkAuth()) {
-      document.getElementById('lock-screen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-    } else {
-      setTimeout(() => document.getElementById('pw-input').focus(), 100);
+function renderOilChart() {
+  const groups = { none: [], meta: [], lemon: [], both: [] };
+  ALL_DATA.forEach(r => groups[oilType(r)].push(r.glucose));
+
+  const avg = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
+  const labels  = ['미복용', '메타파워', '레몬', '둘 다'];
+  const vals    = [avg(groups.none), avg(groups.meta), avg(groups.lemon), avg(groups.both)];
+  const counts  = [groups.none.length, groups.meta.length, groups.lemon.length, groups.both.length];
+  const bgColors = ['rgba(156,163,175,0.75)', 'rgba(196,120,74,0.75)', 'rgba(168,146,64,0.75)', 'rgba(90,138,106,0.75)'];
+
+  const ctx = document.getElementById('oilChart').getContext('2d');
+  if (oilChart) oilChart.destroy();
+
+  oilChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: '평균 혈당', data: vals, backgroundColor: bgColors, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: c => `평균 ${c.parsed.y} mg/dL`,
+          afterLabel: c => `${counts[c.dataIndex]}회 기록`,
+        } }
+      },
+      scales: {
+        y: { min: 70, suggestedMax: 155, grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#555b6e', font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { color: '#555b6e', font: { size: 11 } } }
+      }
     }
-  </script>
-  <script src="js/app.js"></script>
-</body>
-</html>
+  });
+}
+
+// ── Log Table ────────────────────────────────────────────────
+
+function populateFilters() {
+  const months = [...new Set(ALL_DATA.map(r => r.date.slice(0,7)))].sort().reverse();
+  const sel = document.getElementById('filterMonth');
+  sel.innerHTML = '<option value="">전체</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+function renderLog() {
+  const fMonth  = document.getElementById('filterMonth').value;
+  const fPeriod = document.getElementById('filterPeriod').value;
+  const fOil    = document.getElementById('filterOil').value;
+
+  let rows = [...ALL_DATA].sort((a,b) => b.date.localeCompare(a.date));
+  if (fMonth)  rows = rows.filter(r => r.date.startsWith(fMonth));
+  if (fPeriod) {
+    rows = rows.filter(r => {
+      const d = parseInt(r.date.slice(8));
+      if (fPeriod === '1') return d <= 10;
+      if (fPeriod === '2') return d >= 11 && d <= 20;
+      return d >= 21;
+    });
+  }
+  if (fOil) rows = rows.filter(r => oilType(r) === fOil);
+
+  const tip = document.getElementById('tooltip');
+  const tbody = document.getElementById('logBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">해당 조건의 기록이 없습니다.</td></tr>';
+    return;
+  }
+  const lv = level;
+  tbody.innerHTML = rows.map(r => {
+    const l = lv(r.glucose);
+    const ot = oilType(r);
+    const metaDot  = r.meta  > 0 ? `<span class="oil-dot" style="background:#f97316"></span>${r.meta}` : '-';
+    const lemonDot = r.lemon > 0 ? `<span class="oil-dot" style="background:#fde047"></span>${r.lemon}` : '-';
+    return `<tr>
+      <td>${r.date}</td>
+      <td>${r.time || '-'}</td>
+      <td class="glucose-val" style="color:${r.glucose>=126?'#b91c1c':r.glucose>=100?'#92600a':'#166534'}">${r.glucose}</td>
+      <td><span class="stat-badge ${l.cls}">${l.label}</span></td>
+      <td>${metaDot}</td>
+      <td>${lemonDot}</td>
+      <td>${r.sleep || '-'}</td>
+      <td class="meal-cell" title="${r.meal}">${r.meal || '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Add Entry ────────────────────────────────────────────────
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const date    = document.getElementById('f-date').value;
+  const glucose = parseInt(document.getElementById('f-glucose').value);
+  if (!date || isNaN(glucose)) { setStatus('날짜와 혈당 수치를 입력해주세요.', 'err'); return; }
+
+  const payload = {
+    date,
+    time:       document.getElementById('f-time').value,
+    glucose,
+    sleep:      document.getElementById('f-sleep').value,
+    meta:       document.getElementById('f-meta').value || 0,
+    lemon:      document.getElementById('f-lemon').value || 0,
+    meal:       document.getElementById('f-meal').value,
+    note:       document.getElementById('f-note').value,
+  };
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  setStatus('저장 중...', '');
+
+  if (CONFIG.APPS_SCRIPT_URL.includes('YOUR_SCRIPT_ID')) {
+    // Demo mode: just add to local array
+    ALL_DATA.push({ ...payload, lastMealTime:'', oilYN:'Y', prevMed:'', lastOil:'' });
+    ALL_DATA.sort((a,b) => a.date.localeCompare(b.date));
+    renderAll();
+    setStatus('저장됨 (데모 모드)', 'ok');
+    btn.disabled = false;
+    return;
+  }
+
+  try {
+    await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    setStatus('✓ 저장 완료 — 구글 시트에 반영됐습니다.', 'ok');
+    setTimeout(fetchData, 1500);
+  } catch (e) {
+    setStatus('오류가 발생했습니다. 다시 시도해주세요.', 'err');
+  }
+  btn.disabled = false;
+});
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('saveStatus');
+  el.textContent = msg;
+  el.className = 'save-status ' + cls;
+}
+
+// ── Tab switching ─────────────────────────────────────────────
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'log') { populateFilters(); renderLog(); }
+  });
+});
+
+// ── Range pills ───────────────────────────────────────────────
+
+document.querySelectorAll('.pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    currentRange = parseInt(pill.dataset.range);
+    renderTrend();
+  });
+});
+
+// ── Log filters ───────────────────────────────────────────────
+
+['filterMonth','filterPeriod','filterOil'].forEach(id => {
+  document.getElementById(id).addEventListener('change', renderLog);
+});
+
+// ── Sync button ───────────────────────────────────────────────
+
+document.getElementById('syncBtn').addEventListener('click', () => {
+  const btn = document.getElementById('syncBtn');
+  btn.classList.add('loading');
+  fetchData().finally(() => btn.classList.remove('loading'));
+});
+
+// ── Form defaults ─────────────────────────────────────────────
+
+function setFormDefaults() {
+  const now = new Date();
+  document.getElementById('f-date').value = now.toISOString().slice(0,10);
+  document.getElementById('f-time').value =
+    String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+}
+
+// ── Init ──────────────────────────────────────────────────────
+
+setFormDefaults();
+fetchData();
+
+// ── Resize handler ────────────────────────────────────────────
+// 브라우저 리사이즈 시 모든 차트 재렌더링
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (document.getElementById('tab-dashboard').classList.contains('active')) {
+      renderTrend();
+      renderMonthChart();
+      renderOilChart();
+    }
+  }, 150);
+});
