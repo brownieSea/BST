@@ -61,12 +61,33 @@ function oilType(row) {
   return 'none';
 }
 
+function isAfterMeal(row) {
+  // L열: 오일 마지막 식후 여부 (Y=식후, N=식간, 빈칸=미기록)
+  return (row.lastOil || '').trim().toUpperCase() === 'Y';
+}
+
 function pointColor(row) {
   const t = oilType(row);
+  if (t === 'none') return '#333333';
+  // 오일 복용한 경우 식후/식간 색상 동일, 테두리로 구분
   if (t === 'meta') return '#ffc72e';
   if (t === 'lemon') return '#fff98c';
   if (t === 'both') return '#82af8c';
-  return '#333';
+  return '#333333';
+}
+
+function pointBorderColor(row) {
+  const t = oilType(row);
+  if (t === 'none') return '#333333';
+  // 식후(Y) → 테두리 없음(같은색), 식간(N) → 흰 테두리
+  if (isAfterMeal(row)) return pointColor(row);
+  return '#ffffff';
+}
+
+function pointBorderWidth(row) {
+  const t = oilType(row);
+  if (t === 'none') return 1;
+  return isAfterMeal(row) ? 0 : 2;
 }
 
 // ── CSV Fetch ────────────────────────────────────────────────
@@ -243,9 +264,11 @@ function renderTrend() {
   if (currentRange > 0) rows = rows.slice(-currentRange);
 
   const labels = rows.map(r => r.date.slice(5));
-  const vals   = rows.map(r => r.glucose);
+  const vals   = rows.map(r => r.glucose || null);
   const colors = rows.map(r => pointColor(r));
-  const sizes  = rows.map(() => 6);
+  const borderColors = rows.map(r => pointBorderColor(r));
+  const borderWidths = rows.map(r => pointBorderWidth(r));
+  const sizes  = rows.map(() => 7);
 
   const ctx = document.getElementById('trendChart').getContext('2d');
   if (trendChart) trendChart.destroy();
@@ -260,9 +283,10 @@ function renderTrend() {
         borderColor: 'rgba(42,124,94,0.35)',
         borderWidth: 1.5,
         pointBackgroundColor: colors,
-        pointBorderColor: colors,
+        pointBorderColor: borderColors,
+        pointBorderWidth: borderWidths,
         pointRadius: sizes,
-        pointHoverRadius: 8,
+        pointHoverRadius: 9,
         tension: 0.3,
         fill: false,
       }]
@@ -407,7 +431,7 @@ function renderOilChart() {
   const labels  = ['미복용', '메타파워', '레몬', '둘 다'];
   const vals    = [avg(groups.none), avg(groups.meta), avg(groups.lemon), avg(groups.both)];
   const counts  = [groups.none.length, groups.meta.length, groups.lemon.length, groups.both.length];
-  const bgColors = ['rgba(51,51,51,0.7)', 'rgba(255,199,46,0.8)', 'rgba(255,249,140,0.8)', 'rgba(130,175,140,0.7)'];
+  const bgColors = ['rgba(180,180,180,0.6)', 'rgba(255,199,46,0.8)', 'rgba(255,249,140,0.8)', 'rgba(130,175,140,0.7)'];
 
   const ctx = document.getElementById('oilChart').getContext('2d');
   if (oilChart) oilChart.destroy();
