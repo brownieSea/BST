@@ -94,18 +94,25 @@
         <div class="chart-panel">
           <div class="panel-header">
             <h2>혈당 추이</h2>
-            <div class="range-pills">
-              <button class="pill active" data-range="10">10일</button>
-              <button class="pill" data-range="30">1개월</button>
-              <button class="pill" data-range="0">전체</button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="range-pills">
+                <button class="pill active" data-range="10">10일</button>
+                <button class="pill" data-range="30">1개월</button>
+              </div>
+              <div class="period-nav">
+                <button class="nav-arrow" id="prevPeriod" title="이전">&#8249;</button>
+                <span id="periodLabel"></span>
+                <button class="nav-arrow" id="nextPeriod" title="다음">&#8250;</button>
+              </div>
             </div>
           </div>
           <div class="chart-legend">
-            <span class="leg"><span class="leg-dot" style="background:#ffc72e"></span>메타파워 (식후)</span>
-            <span class="leg"><span class="leg-dot" style="background:#ffc72e;outline:2px solid #fff;outline-offset:-1px;box-shadow:0 0 0 2px #ffc72e"></span>메타파워 (식간)</span>
-            <span class="leg"><span class="leg-dot" style="background:#fff98c;border:1px solid #ccc"></span>레몬 (식후)</span>
-            <span class="leg"><span class="leg-dot" style="background:#fff98c;outline:2px solid #fff;outline-offset:-1px;box-shadow:0 0 0 2px #ccc"></span>레몬 (식간)</span>
-            <span class="leg"><span class="leg-dot" style="background:#82af8c"></span>둘 다 (식후)</span>
+            <span class="leg"><span class="leg-dot" style="background:#e8900a"></span>메타파워 식후</span>
+            <span class="leg"><span class="leg-dot" style="background:#fcd34d"></span>메타파워 식간</span>
+            <span class="leg"><span class="leg-dot" style="background:#a3a800"></span>레몬 식후</span>
+            <span class="leg"><span class="leg-dot" style="background:#f0f08c"></span>레몬 식간</span>
+            <span class="leg"><span class="leg-dot" style="background:#5a8a6a"></span>둘 다 식후</span>
+            <span class="leg"><span class="leg-dot" style="background:#a8d4b4"></span>둘 다 식간</span>
             <span class="leg"><span class="leg-dot" style="background:#333333"></span>미복용</span>
             <span class="leg leg-line" style="color:#ef4444">── 주의선(100)</span>
             <span class="leg leg-line" style="color:#f97316">── 위험선(126)</span>
